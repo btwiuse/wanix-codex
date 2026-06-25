@@ -11,7 +11,7 @@
 //     (?relay= > window.RELAY_DEFAULT > same-origin; `wanix serve` provides it).
 //
 // Also: optionally load big assets from R2/CDN (?assets= / window.ASSET_BASE),
-// reassemble split parts (split-manifest.json), then import wanix.min.js.
+// then import wanix.min.js.
 
 const pageDir = new URL('.', location.href);
 const params = new URLSearchParams(location.search);
@@ -49,59 +49,6 @@ function applyAssetBase() {
             }
         }
     }
-}
-
-async function installSplitFetch() {
-    let manifest;
-    try {
-        const r = await fetch(new URL('split-manifest.json', pageDir), { cache: 'no-store' });
-        if (!r.ok) return;
-        manifest = await r.json();
-    } catch (e) {
-        return; // no manifest: local / unsplit / external-asset deployment
-    }
-    const files = manifest.files || {};
-    if (!Object.keys(files).length) return;
-
-    const origFetch = window.fetch.bind(window);
-    window.fetch = function (input, init) {
-        let rel = null;
-        try {
-            const u = new URL(typeof input === 'string' ? input : input.url, location.href);
-            if (u.origin === location.origin && u.pathname.startsWith(pageDir.pathname)) {
-                rel = decodeURIComponent(u.pathname.slice(pageDir.pathname.length));
-            }
-        } catch (e) { /* fall through to the real fetch */ }
-        const entry = rel && files[rel];
-        if (!entry) {
-            return origFetch(input, init);
-        }
-        const parts = entry.parts;
-        let i = 0;
-        let reader = null;
-        const body = new ReadableStream({
-            async pull(controller) {
-                while (true) {
-                    if (!reader) {
-                        if (i >= parts.length) { controller.close(); return; }
-                        const resp = await origFetch(new URL(parts[i], pageDir));
-                        if (!resp.ok) { controller.error(new Error(`HTTP ${resp.status} fetching ${parts[i]}`)); return; }
-                        reader = resp.body.getReader();
-                        i++;
-                    }
-                    const { value, done } = await reader.read();
-                    if (done) { reader = null; continue; }
-                    controller.enqueue(value);
-                    return;
-                }
-            },
-            cancel(reason) { if (reader) reader.cancel(reason); },
-        });
-        return Promise.resolve(new Response(body, {
-            status: 200,
-            headers: { 'Content-Type': entry.contentType || 'application/octet-stream' },
-        }));
-    };
 }
 
 function probeRelay(relay) {
@@ -174,7 +121,6 @@ function probeRelay(relay) {
         }
     }, 500);
 
-    await installSplitFetch();
     await import('./wanix.min.js');
 
     if (mode === 'relay') probeRelay(relay);
