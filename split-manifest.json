@@ -1,0 +1,14 @@
+{
+  "files": {
+    "wanix-linux-codex.tgz": {
+      "parts": [
+        "wanix-linux-codex.tgz.part.aaa",
+        "wanix-linux-codex.tgz.part.aab",
+        "wanix-linux-codex.tgz.part.aac",
+        "wanix-linux-codex.tgz.part.aad",
+        "wanix-linux-codex.tgz.part.aae"
+      ],
+      "contentType": "application/gzip"
+    }
+  }
+}
