@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Codex in Wanix</title>
+    <!-- optional: deploy scripts generate this to set ASSET_BASE /
+         RELAY_DEFAULT (window globals read by boot.js). Absent in dev. -->
+    <script src="config.js" onerror="this.remove()"></script>
+    <style>
+        html, body { margin: 0; padding: 0; height: 100%; background: #1e1e1e; }
+        #boot-banner {
+            position: fixed; inset: 0; z-index: 10;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #ccc; font-family: ui-monospace, Menlo, monospace; font-size: 14px;
+            background: #1e1e1e; transition: opacity 0.5s; pointer-events: none;
+        }
+        #boot-banner.hidden { opacity: 0; }
+    </style>
+</head>
+<body>
+    <div id="boot-banner">
+        <div style="font-size: 18px; margin-bottom: 12px;">Codex in Wanix</div>
+        <div id="boot-status">downloading system…</div>
+    </div>
+
+    <wanix-system wasm="./wanix.wasm">
+
+        <!-- Alpine i386 root with git + codex (i686 build) baked in.
+             The guest's root *is* this namespace, mounted over virtio-9p. -->
+        <wanix-bind dst="." src="./wanix-linux-codex.tgz" type="archive"></wanix-bind>
+
+        <!-- /project persists across reloads in the browser's OPFS -->
+        <wanix-bind dst="project" src="#web/opfs"></wanix-bind>
+
+        <!-- v86 driver (x86 emulator + guest kernel glue) -->
+        <wanix-bind dst="#vm/v86" src="./v86.tgz" type="archive"></wanix-bind>
+
+        <!-- the Linux VM; netdev (relay URL) is set by boot.js -->
+        <wanix-vm id="vm" export="ttyS0" mem="1G" start></wanix-vm>
+
+        <!-- VS Code (Code-OSS web) with terminal into the VM -->
+        <wanix-workbench assets="./workbench"
+            task-ns="#vm/1/guest/#task"
+            term-ns="#vm/1/guest/#term"
+            wd="project"
+            raw term>
+            <wanix-task role="shell" cmd="/bin/sh -l"></wanix-task>
+        </wanix-workbench>
+
+    </wanix-system>
+
+    <!-- relay resolution (?relay= > relay-config.js > same-origin), split-asset
+         reassembly for CDN deploys, then imports wanix.min.js -->
+    <script src="boot.js" type="module"></script>
+</body>
+</html>
